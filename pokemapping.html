@@ -1,0 +1,1201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PokéMapping — every bush has a resident</title>
+<meta name="description" content="PokéMapping is a live world map of Pokémon sightings — pinned in real time, down to the smallest villages on Earth. Free to browse, free to explore.">
+<meta name="theme-color" content="#12261A">
+<meta property="og:title" content="PokéMapping — every bush has a resident">
+<meta property="og:description" content="A live world map of Pokémon sightings, pinned in real time down to the smallest villages on Earth.">
+<meta property="og:type" content="website">
+<meta name="twitter:card" content="summary">
+<link rel="icon" type="image/png" href="pokemapping-logo.png">
+<link rel="apple-touch-icon" href="pokemapping-logo.png">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "WebSite",
+  "name": "PokéMapping",
+  "description": "A live world map of Pokémon sightings, pinned in real time down to the smallest villages on Earth.",
+  "applicationCategory": "Entertainment",
+  "isAccessibleForFree": true
+}
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Work+Sans:wght@400;500;600&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<style>
+  :root{
+    --forest-deep:#12261A;
+    --forest-panel:#1B3527;
+    --dusk-navy:#182338;
+    --parchment:#F0E6C8;
+    --parchment-dim:#C9C0A6;
+    --pokeball-red:#D6413B;
+    --gold:#F0B429;
+    --sage:#7C9473;
+    --line: rgba(240,230,200,0.12);
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  html{scroll-behavior:smooth;}
+  body{
+    background:var(--forest-deep);
+    color:var(--parchment);
+    font-family:'Work Sans', sans-serif;
+    line-height:1.55;
+    overflow-x:hidden;
+  }
+  a{color:inherit;}
+  img{max-width:100%; display:block;}
+  h1,h2,h3{font-family:'Fraunces', serif; font-weight:600; letter-spacing:-0.01em;}
+  .mono{font-family:'Space Mono', monospace;}
+  .wrap{max-width:1180px; margin:0 auto; padding:0 28px;}
+  :focus-visible{outline:2px solid var(--gold); outline-offset:3px;}
+  .skip-link{
+    position:absolute; top:-60px; left:12px; z-index:100;
+    background:var(--gold); color:var(--forest-deep); font-weight:600;
+    padding:10px 18px; border-radius:8px; text-decoration:none; transition:top .2s ease;
+  }
+  .skip-link:focus{top:12px;}
+
+  /* NAV */
+  header{
+    position:sticky; top:0; z-index:50;
+    background:rgba(18,38,26,0.88);
+    backdrop-filter:blur(10px);
+    border-bottom:1px solid var(--line);
+  }
+  nav{display:flex; align-items:center; justify-content:space-between; padding:18px 28px; max-width:1180px; margin:0 auto;}
+  .brand{display:flex; align-items:center; gap:10px; font-family:'Fraunces', serif; font-weight:700; font-size:1.2rem; letter-spacing:-0.01em;}
+  .brand .dot{width:10px; height:10px; border-radius:50%; background:var(--gold); box-shadow:0 0 10px var(--gold); animation:pulse 2.4s ease-in-out infinite;}
+  .brand-logo{
+    height:42px; width:auto; display:block;
+    border-radius:50%;
+    box-shadow:0 0 0 2px rgba(240,180,41,0.25), 0 4px 14px rgba(0,0,0,0.35);
+    transition:transform .2s ease, box-shadow .2s ease;
+  }
+  .brand:hover .brand-logo{
+    transform:scale(1.06);
+    box-shadow:0 0 0 2px rgba(240,180,41,0.45), 0 6px 18px rgba(0,0,0,0.4);
+  }
+  footer .brand-logo{height:36px;}
+  .navlinks{display:flex; gap:32px; font-size:0.92rem; color:var(--parchment-dim);}
+  .navlinks a{text-decoration:none; transition:color .2s;}
+  .navlinks a:hover{color:var(--gold);}
+  .btn{
+    display:inline-flex; align-items:center; gap:8px;
+    background:var(--pokeball-red); color:var(--parchment);
+    border:none; padding:11px 22px; border-radius:999px;
+    font-family:'Work Sans'; font-weight:600; font-size:0.92rem;
+    cursor:pointer; text-decoration:none;
+    box-shadow:0 6px 20px rgba(214,65,59,0.35);
+    transition:transform .18s ease, box-shadow .18s ease;
+  }
+  .btn:hover{transform:translateY(-2px); box-shadow:0 10px 26px rgba(214,65,59,0.45);}
+  .btn-ghost{background:transparent; border:1px solid var(--line); box-shadow:none;}
+  .btn-ghost:hover{border-color:var(--gold); color:var(--gold); transform:none;}
+  .navmenu-toggle{display:none; background:none; border:none; color:var(--parchment); font-size:1.5rem; cursor:pointer; line-height:1;}
+  .mobile-menu{
+    display:none; flex-direction:column; overflow:hidden;
+    max-height:0; opacity:0; transition:max-height .28s ease, opacity .2s ease;
+    border-top:1px solid var(--line);
+  }
+  .mobile-menu.open{max-height:280px; opacity:1;}
+  .mobile-menu a{
+    padding:16px 28px; text-decoration:none; color:var(--parchment-dim);
+    border-bottom:1px solid var(--line); font-size:0.95rem;
+  }
+  .mobile-menu a:hover, .mobile-menu a:active{color:var(--gold);}
+
+  /* HERO */
+  .hero{
+    padding:88px 0 60px;
+    position:relative;
+  }
+  .hero-grid{
+    display:grid; grid-template-columns:1.05fr 0.95fr; gap:56px; align-items:center;
+  }
+  .eyebrow{
+    font-family:'Space Mono', monospace; font-size:0.78rem; letter-spacing:0.12em; text-transform:uppercase;
+    color:var(--gold); display:flex; align-items:center; gap:10px; margin-bottom:18px;
+  }
+  .eyebrow::before{content:''; width:22px; height:1px; background:var(--gold);}
+  .hero h1{font-size:clamp(2.3rem, 4.2vw, 3.6rem); line-height:1.06; margin-bottom:20px;}
+  .hero h1 em{font-style:normal; color:var(--gold);}
+  .hero p.lead{font-size:1.08rem; color:var(--parchment-dim); max-width:480px; margin-bottom:30px;}
+  .hero-ctas{display:flex; gap:14px; align-items:center; flex-wrap:wrap; margin-bottom:36px;}
+  .hero-note{font-size:0.85rem; color:var(--parchment-dim); font-family:'Space Mono', monospace;}
+
+  .stat-row{display:flex; gap:34px; flex-wrap:wrap; padding-top:8px; border-top:1px solid var(--line);}
+  .stat b{display:block; font-family:'Fraunces', serif; font-size:1.5rem; color:var(--parchment);}
+  .stat span{font-size:0.78rem; color:var(--parchment-dim); text-transform:uppercase; letter-spacing:0.05em;}
+
+  /* HERO MAP VISUAL */
+  .map-card{
+    position:relative;
+    background:var(--forest-panel);
+    border:1px solid var(--line);
+    border-radius:18px;
+    padding:16px;
+    box-shadow:0 30px 60px -20px rgba(0,0,0,0.6);
+  }
+  .map-card .map-head{display:flex; justify-content:space-between; align-items:center; padding:4px 6px 14px; font-family:'Space Mono'; font-size:0.72rem; color:var(--parchment-dim);}
+  .sound-toggle{
+    background:none; border:1px solid var(--line); border-radius:999px;
+    width:26px; height:26px; display:inline-flex; align-items:center; justify-content:center;
+    font-size:0.85rem; cursor:pointer; color:var(--parchment-dim); transition:all .15s ease; padding:0;
+  }
+  .sound-toggle:hover{border-color:var(--gold); color:var(--parchment);}
+  .map-foot{padding:12px 6px 2px; font-size:0.68rem; color:var(--parchment-dim); text-align:center;}
+  .live-dot{width:7px; height:7px; border-radius:50%; background:#67d38a; display:inline-block; margin-right:6px; box-shadow:0 0 6px #67d38a; animation:pulse 1.8s ease-in-out infinite;}
+  #worldmap-wrap{
+    position:relative; width:100%; aspect-ratio:10/5.4; border-radius:10px; overflow:hidden;
+    background:#0d2318;
+  }
+  #worldmap-map{position:absolute; inset:0; width:100%; height:100%; background:#0d2318;}
+  .leaflet-container{font-family:'Work Sans', sans-serif; background:#0d2318;}
+  .leaflet-control-attribution{
+    background:rgba(13,35,24,0.7) !important; color:var(--parchment-dim) !important;
+    font-family:'Space Mono', monospace; font-size:0.58rem !important;
+  }
+  .leaflet-control-attribution a{color:var(--parchment) !important;}
+  .leaflet-popup-content-wrapper{
+    background:var(--dusk-navy); color:var(--parchment); border-radius:10px;
+    box-shadow:0 12px 28px rgba(0,0,0,0.5);
+  }
+  .leaflet-popup-tip{background:var(--dusk-navy);}
+  .leaflet-popup-content{margin:12px 14px; font-family:'Work Sans', sans-serif;}
+  .leaflet-popup-close-button{color:var(--parchment-dim) !important;}
+  .poke-popup .pname{font-family:'Fraunces', serif; font-weight:600; font-size:0.95rem; display:block; color:var(--parchment);}
+  .poke-popup .ploc{font-family:'Space Mono'; font-size:0.68rem; color:var(--parchment-dim); display:block; margin-top:4px; line-height:1.5;}
+  .poke-popup .prar{font-family:'Space Mono'; font-size:0.68rem; margin-top:4px; display:block;}
+  .poke-pin-wrap{background:none; border:none;}
+  .poke-pin{
+    position:relative; width:34px; height:44px;
+    display:flex; align-items:flex-end; justify-content:center; cursor:pointer;
+    animation: pinFloat 3.2s ease-in-out infinite;
+    transition: transform 0.25s cubic-bezier(.34,1.56,.64,1), filter 0.25s ease;
+  }
+  .poke-pin:hover{
+    transform: scale(1.22) translateY(-4px);
+    filter: brightness(1.25) drop-shadow(0 0 8px currentColor);
+    z-index: 20;
+  }
+  .poke-pin .pin-glow{
+    position:absolute; bottom:2px; width:18px; height:18px; border-radius:50%;
+    opacity:0.4; animation: glowPulse 2.2s ease-in-out infinite;
+    filter: blur(2px);
+  }
+  .poke-pin .pin-ring{
+    position:absolute; bottom:4px; width:22px; height:22px; border-radius:50%;
+    border:1.5px solid currentColor; opacity:0;
+    animation: ringExpand 2.8s ease-out infinite;
+  }
+  .poke-pin .pin-dot{
+    position:absolute; bottom:6px; width:8px; height:8px; border-radius:50%;
+    box-shadow:0 2px 6px rgba(0,0,0,0.6);
+    animation: pinpulse 2.6s ease-in-out infinite;
+    transform-origin:center;
+  }
+  .poke-pin svg{position:relative; margin-bottom:16px; transition: transform 0.3s ease;}
+  .poke-pin:hover svg{transform: scale(1.08);}
+  .poke-pin.dimmed{opacity:0.12; animation: none; filter: grayscale(0.6);}
+  .poke-pin.dimmed:hover{opacity:0.35;}
+
+  @keyframes pinFloat{
+    0%,100%{transform: translateY(0);}
+    50%{transform: translateY(-5px);}
+  }
+  @keyframes pinpulse{0%,100%{transform:scale(1);} 50%{transform:scale(1.4);}}
+  @keyframes glowPulse{0%,100%{opacity:0.35; transform:scale(1);} 50%{opacity:0.65; transform:scale(1.25);}}
+  @keyframes ringExpand{
+    0%{transform:scale(0.6); opacity:0.55;}
+    70%{opacity:0.15;}
+    100%{transform:scale(1.8); opacity:0;}
+  }
+  @keyframes pulse{0%,100%{opacity:1;} 50%{opacity:0.35;}}
+  @keyframes summonPop{
+    0%{transform:scale(0) translateY(18px); opacity:0; filter:brightness(2);}
+    40%{transform:scale(1.45) translateY(-10px); opacity:1; filter:brightness(1.6);}
+    65%{transform:scale(0.9) translateY(2px);}
+    85%{transform:scale(1.08) translateY(-2px);}
+    100%{transform:scale(1) translateY(0); opacity:1; filter:brightness(1);}
+  }
+  .summon-pop{animation:summonPop .65s cubic-bezier(.34,1.56,.64,1) forwards;}
+  .summon-pop .pin-ring{animation: ringExpand 0.9s ease-out 0.1s 2;}
+
+  .map-search{display:flex; gap:8px; padding:0 6px 12px;}
+  .map-search input{
+    flex:1; background:var(--dusk-navy); border:1px solid var(--line); border-radius:999px;
+    padding:10px 16px; color:var(--parchment); font-family:'Work Sans', sans-serif; font-size:0.88rem;
+  }
+  .map-search input::placeholder{color:var(--parchment-dim);}
+  .map-search input:focus{outline:none; border-color:var(--gold);}
+  .map-search button{
+    background:var(--pokeball-red); color:var(--parchment); border:none; border-radius:999px;
+    width:40px; height:40px; flex-shrink:0; cursor:pointer; font-size:1rem;
+    display:flex; align-items:center; justify-content:center; transition:transform .15s ease;
+  }
+  .map-search button:hover{transform:translateY(-1px);}
+  .map-search-status{padding:8px 6px 0; font-size:0.68rem; color:var(--parchment-dim); min-height:14px;}
+  .map-zoom-controls{
+    position:absolute; top:10px; right:10px; z-index:7;
+    display:flex; flex-direction:column; gap:6px;
+  }
+  .map-zoom-controls button{
+    width:28px; height:28px; border-radius:8px; border:1px solid var(--line);
+    background:rgba(18,38,26,0.85); color:var(--parchment); font-size:1rem; line-height:1; cursor:pointer;
+    display:flex; align-items:center; justify-content:center; backdrop-filter:blur(4px);
+    transition:all .15s ease; font-family:'Space Mono', monospace;
+  }
+  .map-zoom-controls button:hover{border-color:var(--gold); color:var(--gold);}
+  .map-zoom-hint{
+    position:absolute; bottom:8px; left:10px; z-index:7;
+    font-family:'Space Mono', monospace; font-size:0.62rem; color:rgba(240,230,200,0.55);
+    background:rgba(13,35,24,0.55); padding:4px 9px; border-radius:999px; pointer-events:none;
+  }
+  .map-summon-btn{
+    position:absolute; bottom:34px; right:10px; z-index:7;
+    display:flex; align-items:center; gap:6px;
+    background:var(--pokeball-red); color:var(--parchment); border:none;
+    padding:9px 16px; border-radius:999px;
+    font-family:'Work Sans', sans-serif; font-weight:600; font-size:0.78rem;
+    cursor:pointer; box-shadow:0 6px 16px rgba(214,65,59,0.4);
+    transition:transform .15s ease, box-shadow .15s ease;
+  }
+  .map-summon-btn:hover{transform:translateY(-2px); box-shadow:0 10px 22px rgba(214,65,59,0.5);}
+  .map-summon-btn:active{transform:translateY(0) scale(0.96);}
+  .map-summon-btn:disabled{opacity:0.55; cursor:default; transform:none; box-shadow:none;}
+
+  .map-legend{display:flex; gap:16px; flex-wrap:wrap; padding:12px 6px 0;}
+  .map-legend .lg-item{
+    display:flex; align-items:center; gap:6px; font-family:'Space Mono'; font-size:0.65rem; color:var(--parchment-dim);
+    background:none; border:1px solid transparent; border-radius:999px; padding:5px 10px; cursor:pointer; transition:all .15s ease;
+  }
+  .map-legend .lg-item:hover{border-color:var(--line); color:var(--parchment);}
+  .map-legend .lg-item.active{border-color:var(--gold); color:var(--parchment); background:rgba(240,180,41,0.1);}
+  .map-legend .lg-dot{width:8px; height:8px; border-radius:50%;}
+
+  /* TICKER */
+  .ticker-section{border-top:1px solid var(--line); border-bottom:1px solid var(--line); background:var(--dusk-navy); overflow:hidden; padding:14px 0;}
+  .ticker-label{font-family:'Space Mono'; font-size:0.7rem; color:var(--gold); letter-spacing:0.1em; text-transform:uppercase; padding:0 28px; display:inline-flex; align-items:center; gap:8px; white-space:nowrap;}
+  .ticker-track{display:flex; align-items:center; gap:0; white-space:nowrap; animation:scroll 32s linear infinite;}
+  .ticker-section:hover .ticker-track{animation-play-state:paused;}
+  .ticker-item{font-family:'Space Mono'; font-size:0.82rem; color:var(--parchment-dim); padding:0 26px; border-right:1px solid var(--line); display:inline-flex; gap:10px;}
+  .ticker-item b{color:var(--parchment); font-weight:700;}
+  .ticker-item .rarity-leg{color:var(--gold);}
+  .ticker-item .rarity-rare-t{color:#8FB3FF;}
+  @keyframes scroll{from{transform:translateX(0);} to{transform:translateX(-50%);}}
+
+  /* SECTIONS */
+  section{padding:88px 0;}
+  .section-head{max-width:600px; margin-bottom:52px;}
+  .section-head .eyebrow{margin-bottom:14px;}
+  .section-head h2{font-size:clamp(1.8rem,3vw,2.5rem); margin-bottom:14px;}
+  .section-head p{color:var(--parchment-dim); font-size:1.02rem;}
+
+  .features{display:grid; grid-template-columns:repeat(3,1fr); gap:26px;}
+  .feature-card{
+    background:var(--forest-panel); border:1px solid var(--line); border-radius:16px; padding:30px 26px;
+    transition:transform .2s ease, border-color .2s ease;
+  }
+  .feature-card:hover{transform:translateY(-4px); border-color:rgba(240,180,41,0.35);}
+  .feature-card .icon{width:42px; height:42px; border-radius:10px; display:flex; align-items:center; justify-content:center; font-size:1.3rem; margin-bottom:18px; background:rgba(240,180,41,0.12);}
+  .feature-card h3{font-size:1.15rem; margin-bottom:10px; font-weight:600;}
+  .feature-card p{color:var(--parchment-dim); font-size:0.95rem;}
+
+  .howitworks{background:var(--dusk-navy);}
+  .steps{display:grid; grid-template-columns:repeat(3,1fr); gap:0; position:relative;}
+  .step{padding:0 30px; position:relative;}
+  .step:not(:last-child)::after{content:''; position:absolute; top:22px; right:-2px; width:calc(100% - 40px); height:1px; background:var(--line);}
+  .step .num{font-family:'Space Mono'; font-size:0.85rem; color:var(--gold); margin-bottom:16px; display:block;}
+  .step h3{font-size:1.15rem; margin-bottom:10px;}
+  .step p{color:var(--parchment-dim); font-size:0.94rem;}
+
+  /* TRENDING VILLAGES */
+  .trending-list{border-top:1px solid var(--line);}
+  .trend-row{
+    display:grid; grid-template-columns:44px 1fr auto auto; align-items:center; gap:18px;
+    padding:18px 6px; border-bottom:1px solid var(--line);
+  }
+  .trend-rank{font-family:'Fraunces', serif; font-size:1.3rem; color:var(--gold);}
+  .trend-name{font-weight:600; font-size:1rem;}
+  .trend-place{color:var(--parchment-dim); font-size:0.85rem; font-family:'Space Mono'; margin-top:2px;}
+  .trend-count{font-family:'Space Mono'; font-size:0.85rem; color:var(--parchment-dim); text-align:right;}
+  .trend-count b{color:var(--parchment); display:block; font-family:'Fraunces', serif; font-size:1.1rem;}
+  .trend-poke{display:flex; align-items:center; gap:8px; font-family:'Space Mono'; font-size:0.8rem;}
+  .trend-poke .dot{width:7px; height:7px; border-radius:50%;}
+
+  /* RARITY */
+  .rarity-bar{display:flex; gap:18px; flex-wrap:wrap; margin-top:10px;}
+  .rarity-pill{font-family:'Space Mono'; font-size:0.78rem; padding:8px 16px; border-radius:999px; border:1px solid var(--line); color:var(--parchment-dim); display:flex; align-items:center; gap:8px;}
+  .rarity-pill .sw{width:8px; height:8px; border-radius:50%;}
+
+  /* FAQ */
+  .faq-list{border-top:1px solid var(--line); max-width:760px;}
+  .faq-item{border-bottom:1px solid var(--line);}
+  .faq-item summary{
+    padding:20px 4px; cursor:pointer; list-style:none; display:flex; justify-content:space-between; align-items:center;
+    font-family:'Fraunces', serif; font-weight:600; font-size:1.02rem;
+  }
+  .faq-item summary::-webkit-details-marker{display:none;}
+  .faq-item summary::after{content:'+'; font-family:'Space Mono'; color:var(--gold); font-size:1.3rem; flex-shrink:0; margin-left:16px; transition:transform .2s;}
+  .faq-item[open] summary::after{transform:rotate(45deg);}
+  .faq-item p{color:var(--parchment-dim); font-size:0.95rem; padding:0 4px 22px; max-width:600px;}
+
+  .cta-section{
+    background:linear-gradient(180deg, var(--forest-panel), var(--forest-deep));
+    text-align:center; border-top:1px solid var(--line);
+  }
+  .cta-section h2{font-size:clamp(2rem,4vw,2.8rem); margin-bottom:16px;}
+  .cta-section p{color:var(--parchment-dim); max-width:460px; margin:0 auto 30px;}
+
+  footer{border-top:1px solid var(--line); padding:38px 0; }
+  .foot-row{display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:16px;}
+  .foot-links{display:flex; gap:24px; font-size:0.85rem; color:var(--parchment-dim);}
+  .foot-links a{text-decoration:none;}
+  .foot-links a:hover{color:var(--gold);}
+  .copyright{font-size:0.8rem; color:var(--parchment-dim); font-family:'Space Mono';}
+  .copyright a{color:var(--gold); text-decoration:none; border-bottom:1px solid transparent; transition:border-color .2s;}
+  .copyright a:hover{border-bottom-color:var(--gold);}
+
+  @media (max-width: 860px){
+    .hero-grid{grid-template-columns:1fr;}
+    .navlinks{display:none;}
+    .navmenu-toggle{display:block;}
+    .mobile-menu{display:flex;}
+    .features{grid-template-columns:1fr;}
+    .steps{grid-template-columns:1fr; gap:28px;}
+    .step:not(:last-child)::after{display:none;}
+    .stat-row{gap:22px;}
+    .trend-row{grid-template-columns:32px 1fr auto; row-gap:6px;}
+    .trend-poke{grid-column:2 / 3;}
+  }
+
+  @media (prefers-reduced-motion: reduce){
+    *{animation-duration:0.001ms !important; animation-iteration-count:1 !important; transition-duration:0.001ms !important;}
+  }
+</style>
+</head>
+<body>
+
+<a href="#main-content" class="skip-link">Skip to main content</a>
+
+<noscript>
+  <div style="background:#D6413B; color:#F0E6C8; text-align:center; padding:12px 20px; font-family:'Work Sans', sans-serif; font-size:0.9rem;">
+    PokéMapping needs JavaScript enabled to draw the live map and sighting feed. Please enable it to see the full experience.
+  </div>
+</noscript>
+
+<header>
+  <nav>
+    <a href="#" class="brand" aria-label="PokéMapping home">
+      <img src="pokemapping-logo.png" alt="PokéMapping" class="brand-logo" width="42" height="42">
+    </a>
+    <div class="navlinks">
+      <a href="#map">Live Map</a>
+      <a href="#how-it-works">How It Works</a>
+      <a href="#trending">Trending</a>
+      <a href="#regions">Rarity</a>
+      <a href="#faq">FAQ</a>
+    </div>
+    <a href="#open-map" class="btn">Open the Map</a>
+    <button class="navmenu-toggle" id="navToggle" aria-label="Toggle navigation menu" aria-expanded="false" aria-controls="mobileMenu">☰</button>
+  </nav>
+  <div class="mobile-menu" id="mobileMenu">
+    <a href="#map">Live Map</a>
+    <a href="#how-it-works">How It Works</a>
+    <a href="#trending">Trending</a>
+    <a href="#regions">Rarity</a>
+    <a href="#faq">FAQ</a>
+  </div>
+</header>
+
+<section class="hero" id="main-content">
+  <div class="wrap hero-grid">
+    <div>
+      <div class="eyebrow">Live map, updated every minute</div>
+      <h1>Every bush <em>has a resident.</em></h1>
+      <p class="lead">Our system sweeps the world around the clock, logging Pokémon as they appear and pinning them to a map that shifts with the time of day and weather — just like the real world.</p>
+      <div class="hero-ctas">
+        <a href="#open-map" class="btn">Start Exploring</a>
+        <a href="#how-it-works" class="btn btn-ghost">See How It Works</a>
+      </div>
+      <div class="stat-row">
+        <div class="stat"><b>12,480</b><span>Sightings today</span></div>
+        <div class="stat"><b>342</b><span>Active regions</span></div>
+        <div class="stat"><b>18</b><span>Legendaries this week</span></div>
+      </div>
+    </div>
+
+    <div class="map-card">
+      <div class="map-head"><span><span class="live-dot"></span>LIVE FEED · WORLD MAP</span><span style="display:flex; align-items:center; gap:12px;"><button type="button" id="soundToggle" class="sound-toggle" aria-pressed="true" aria-label="Toggle catch sound effects">🔊</button><span id="mapClock" class="mono">07:04 UTC</span></span></div>
+      <form id="mapSearchForm" class="map-search" autocomplete="off" role="search">
+        <input type="text" id="mapSearchInput" placeholder="Search any city, village, or place…" aria-label="Search for a location on the map">
+        <button type="submit" aria-label="Search location">🔍</button>
+      </form>
+      <div id="worldmap-wrap">
+        <div id="worldmap-map" role="application" aria-label="Interactive world map with Pokémon sighting pins"></div>
+        <div class="map-zoom-controls">
+          <button type="button" id="zoomIn" aria-label="Zoom in">+</button>
+          <button type="button" id="zoomOut" aria-label="Zoom out">−</button>
+          <button type="button" id="zoomReset" aria-label="Reset zoom">⟲</button>
+        </div>
+        <div class="map-zoom-hint">Scroll to zoom · drag to pan · search a place above</div>
+        <button type="button" id="summonBtn" class="map-summon-btn" aria-label="Summon a random Pokémon to the map">✨ Summon</button>
+      </div>
+      <div id="mapSearchStatus" class="map-search-status mono" role="status" aria-live="polite"></div>
+      <div class="map-legend" id="mapLegend">
+        <button type="button" class="lg-item" data-rarity="rarity-common"><span class="lg-dot" style="background:var(--sage)"></span>Common</button>
+        <button type="button" class="lg-item" data-rarity="rarity-uncommon"><span class="lg-dot" style="background:#8FB3FF"></span>Uncommon</button>
+        <button type="button" class="lg-item" data-rarity="rarity-rare"><span class="lg-dot" style="background:var(--pokeball-red)"></span>Rare</button>
+        <button type="button" class="lg-item" data-rarity="rarity-legendary"><span class="lg-dot" style="background:var(--gold)"></span>✦ Legendary</button>
+      </div>
+      <div class="map-foot mono" id="mapFoot">117 pins placed in the world's smallest villages and hamlets — tap any pin for details.</div>
+    </div>
+  </div>
+</section>
+
+<div class="ticker-section" role="marquee" aria-label="Live Pokémon sighting ticker, updates periodically">
+  <div style="display:flex; align-items:center;">
+    <span class="ticker-label">◆ Field Log</span>
+    <div class="ticker-track" id="tickerTrack"></div>
+  </div>
+</div>
+
+<section id="map">
+  <div class="wrap">
+    <div class="section-head">
+      <div class="eyebrow">Three ways to explore</div>
+      <h2>A map that's honest about what's actually out there.</h2>
+      <p>Free to browse, personalized when you're ready, and open to contributions from fellow trainers.</p>
+    </div>
+    <div class="features">
+      <div class="feature-card">
+        <div class="icon">🗺️</div>
+        <h3>Explore Free</h3>
+        <p>Open the world map and see what's turning up nearby, anytime — no account, no cost.</p>
+      </div>
+      <div class="feature-card">
+        <div class="icon">🔔</div>
+        <h3>Subscribe to Your Region</h3>
+        <p>Pick a park, a route, or your hometown. Get notified the moment something rare shows up there.</p>
+      </div>
+      <div class="feature-card">
+        <div class="icon">📍</div>
+        <h3>Drop Your Own Pin</h3>
+        <p>Spot something in person? Drop a pin, log the time, and share it with the rest of the community.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="howitworks" id="how-it-works">
+  <div class="wrap">
+    <div class="section-head">
+      <div class="eyebrow">The short version</div>
+      <h2>From habitat patterns to a notification on your phone.</h2>
+    </div>
+    <div class="steps">
+      <div class="step">
+        <span class="num mono">01</span>
+        <h3>Scan</h3>
+        <p>Our system reads community reports and habitat patterns around the clock — parks in the morning, water at night.</p>
+      </div>
+      <div class="step">
+        <span class="num mono">02</span>
+        <h3>Pin</h3>
+        <p>Every sighting becomes a live pin on the map, complete with time, location, and rarity tier.</p>
+      </div>
+      <div class="step">
+        <span class="num mono">03</span>
+        <h3>Chase</h3>
+        <p>You get a notification and the fastest route there — before the sighting disappears.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="trending">
+  <div class="wrap">
+    <div class="section-head">
+      <div class="eyebrow">Right now</div>
+      <h2>The smallest places are having the biggest moments.</h2>
+      <p>A live look at which tiny villages are drawing the most activity on the map today.</p>
+    </div>
+    <div class="trending-list">
+      <div class="trend-row">
+        <div class="trend-rank mono">01</div>
+        <div>
+          <div class="trend-name">Wae Rebo</div>
+          <div class="trend-place">Manggarai, Indonesia</div>
+        </div>
+        <div class="trend-poke"><span class="dot" style="background:var(--gold)"></span>Charizard leading</div>
+        <div class="trend-count"><b>214</b>sightings today</div>
+      </div>
+      <div class="trend-row">
+        <div class="trend-rank mono">02</div>
+        <div>
+          <div class="trend-name">Hallstatt</div>
+          <div class="trend-place">Salzkammergut, Austria</div>
+        </div>
+        <div class="trend-poke"><span class="dot" style="background:var(--pokeball-red)"></span>Lapras leading</div>
+        <div class="trend-count"><b>189</b>sightings today</div>
+      </div>
+      <div class="trend-row">
+        <div class="trend-rank mono">03</div>
+        <div>
+          <div class="trend-name">Shirakawa-gō</div>
+          <div class="trend-place">Gifu, Japan</div>
+        </div>
+        <div class="trend-poke"><span class="dot" style="background:var(--pokeball-red)"></span>Absol leading</div>
+        <div class="trend-count"><b>176</b>sightings today</div>
+      </div>
+      <div class="trend-row">
+        <div class="trend-rank mono">04</div>
+        <div>
+          <div class="trend-name">Ittoqqortoormiit</div>
+          <div class="trend-place">Northeast Greenland</div>
+        </div>
+        <div class="trend-poke"><span class="dot" style="background:var(--gold)"></span>Articuno leading</div>
+        <div class="trend-count"><b>152</b>sightings today</div>
+      </div>
+      <div class="trend-row">
+        <div class="trend-rank mono">05</div>
+        <div>
+          <div class="trend-name">Aguas Calientes</div>
+          <div class="trend-place">Cusco, Peru</div>
+        </div>
+        <div class="trend-poke"><span class="dot" style="background:var(--gold)"></span>Zapdos leading</div>
+        <div class="trend-count"><b>140</b>sightings today</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="regions">
+  <div class="wrap">
+    <div class="section-head">
+      <div class="eyebrow">Rarity tiers</div>
+      <h2>Not every pin is created equal.</h2>
+      <p>Pin color on the map follows rarity, so you always know what's worth the trip.</p>
+    </div>
+    <div class="rarity-bar">
+      <div class="rarity-pill"><span class="sw" style="background:var(--sage)"></span> Common</div>
+      <div class="rarity-pill"><span class="sw" style="background:#8FB3FF"></span> Uncommon</div>
+      <div class="rarity-pill"><span class="sw" style="background:var(--pokeball-red)"></span> Rare</div>
+      <div class="rarity-pill"><span class="sw" style="background:var(--gold)"></span> ✦ Legendary</div>
+    </div>
+  </div>
+</section>
+
+<section id="faq">
+  <div class="wrap">
+    <div class="section-head">
+      <div class="eyebrow">Good to know</div>
+      <h2>Frequently asked questions.</h2>
+    </div>
+    <div class="faq-list">
+      <details class="faq-item">
+        <summary>Is PokéMapping free to use?</summary>
+        <p>Yes — browsing the live map is always free and doesn't require an account. Subscribing to specific regions for notifications is optional and free as well.</p>
+      </details>
+      <details class="faq-item">
+        <summary>How accurate are the sightings?</summary>
+        <p>Reports are cross-referenced against known habitat patterns — time of day, terrain, and weather — and refreshed continuously, so confidence is always shown alongside each pin.</p>
+      </details>
+      <details class="faq-item">
+        <summary>Can I add my own village or town?</summary>
+        <p>Yes. Tap "Drop a Pin" anywhere on the map to report a sighting — including places too small to have a name on most maps.</p>
+      </details>
+      <details class="faq-item">
+        <summary>Is my location shared when I report a sighting?</summary>
+        <p>Only the pin's location is shared, never your personal device location. You choose exactly where the pin is placed before it's published.</p>
+      </details>
+      <details class="faq-item">
+        <summary>Does PokéMapping work outside big cities?</summary>
+        <p>That's the whole point — the map is built to surface remote hamlets and villages just as clearly as major cities, not just the places most apps already cover.</p>
+      </details>
+    </div>
+  </div>
+</section>
+
+<section class="cta-section" id="open-map">
+  <div class="wrap">
+    <h2>Trainer, your map is waiting.</h2>
+    <p>Free to start exploring. Subscribe to your favorite regions whenever you're ready.</p>
+    <a href="#" class="btn">Open the Map Now</a>
+  </div>
+</section>
+
+<footer id="about">
+  <div class="wrap foot-row">
+    <a href="#" class="brand" aria-label="PokéMapping home">
+      <img src="pokemapping-logo.png" alt="PokéMapping" class="brand-logo" width="36" height="36">
+    </a>
+    <div class="foot-links">
+      <a href="#">Privacy</a>
+      <a href="#">Terms</a>
+      <a href="#">Contact</a>
+      <a href="https://x.com/PokeMapping" target="_blank" rel="noopener noreferrer">𝕏 @PokeMapping</a>
+    </div>
+    <div class="copyright">© 2026 PokéMapping · Game built by <a href="https://x.com/PokeMapping" target="_blank" rel="noopener noreferrer">@PokeMapping</a>. A concept project, not affiliated with Nintendo, Game Freak, or The Pokémon Company.</div>
+  </div>
+</footer>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script>
+  // ---- Enhanced audio system (catch chimes + summon sparkle + search feedback) ----
+  let audioCtx = null;
+  let soundEnabled = true;
+
+  function getAudioCtx(){
+    if(!audioCtx){
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if(!AC) return null;
+      audioCtx = new AC();
+    }
+    if(audioCtx.state === 'suspended') audioCtx.resume();
+    return audioCtx;
+  }
+
+  function playTone(freq, start, duration, type, gainVal, detune){
+    const ctx = getAudioCtx();
+    if(!ctx) return;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = type || 'sine';
+    osc.frequency.value = freq;
+    if(detune) osc.detune.value = detune;
+    gain.gain.setValueAtTime(0.0001, start);
+    gain.gain.exponentialRampToValueAtTime(gainVal || 0.18, start + 0.018);
+    gain.gain.exponentialRampToValueAtTime(0.0001, start + duration);
+    osc.connect(gain).connect(ctx.destination);
+    osc.start(start);
+    osc.stop(start + duration + 0.02);
+  }
+
+  function playCatchSound(rarityText){
+    if(!soundEnabled) return;
+    const ctx = getAudioCtx();
+    if(!ctx) return;
+    const now = ctx.currentTime;
+    const isLeg = /legendary/i.test(rarityText);
+    const isRare = /rare/i.test(rarityText);
+
+    if(isLeg){
+      // Rich ascending 5-note legendary fanfare
+      const notes = [523.25, 659.25, 783.99, 987.77, 1318.51];
+      notes.forEach((freq, i) => {
+        playTone(freq, now + i * 0.085, 0.32, 'sine', 0.2 - i*0.015, 0);
+        playTone(freq * 1.002, now + i * 0.085, 0.28, 'triangle', 0.08, 4);
+      });
+    } else if(isRare){
+      // Bright 3-note rare chime
+      [587.33, 739.99, 880].forEach((freq, i) => {
+        playTone(freq, now + i * 0.09, 0.28, 'sine', 0.2, 0);
+      });
+    } else {
+      // Soft 2-note common/uncommon
+      playTone(523.25, now, 0.26, 'sine', 0.16);
+      playTone(783.99, now + 0.1, 0.28, 'sine', 0.14);
+    }
+  }
+
+  function playSummonSound(rarityText){
+    if(!soundEnabled) return;
+    const ctx = getAudioCtx();
+    if(!ctx) return;
+    const now = ctx.currentTime;
+    // Sparkle whoosh (noise-ish via rapid detuned tones)
+    for(let i=0; i<6; i++){
+      playTone(900 + i*180 + Math.random()*80, now + i*0.04, 0.12, 'sine', 0.07 - i*0.008, Math.random()*30-15);
+    }
+    // Follow with catch-style chime
+    setTimeout(() => playCatchSound(rarityText), 220);
+  }
+
+  function playSearchSuccess(){
+    if(!soundEnabled) return;
+    const ctx = getAudioCtx();
+    if(!ctx) return;
+    const now = ctx.currentTime;
+    playTone(659.25, now, 0.18, 'sine', 0.12);
+    playTone(987.77, now + 0.1, 0.22, 'sine', 0.1);
+  }
+
+  function playSearchFail(){
+    if(!soundEnabled) return;
+    const ctx = getAudioCtx();
+    if(!ctx) return;
+    const now = ctx.currentTime;
+    playTone(220, now, 0.22, 'triangle', 0.1);
+    playTone(185, now + 0.14, 0.28, 'triangle', 0.08);
+  }
+
+  const soundToggle = document.getElementById('soundToggle');
+  soundToggle.addEventListener('click', () => {
+    soundEnabled = !soundEnabled;
+    soundToggle.textContent = soundEnabled ? '🔊' : '🔇';
+    soundToggle.setAttribute('aria-pressed', soundEnabled ? 'true' : 'false');
+    if(soundEnabled) getAudioCtx();
+  });
+
+  // ---- Mobile nav toggle ----
+  const navToggle = document.getElementById('navToggle');
+  const mobileMenu = document.getElementById('mobileMenu');
+  navToggle.addEventListener('click', () => {
+    const isOpen = mobileMenu.classList.toggle('open');
+    navToggle.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+    navToggle.textContent = isOpen ? '✕' : '☰';
+  });
+  mobileMenu.querySelectorAll('a').forEach(a => {
+    a.addEventListener('click', () => {
+      mobileMenu.classList.remove('open');
+      navToggle.setAttribute('aria-expanded', 'false');
+      navToggle.textContent = '☰';
+    });
+  });
+
+  // ---- Live UTC clock in the map header ----
+  const mapClock = document.getElementById('mapClock');
+  function updateClock(){
+    const now = new Date();
+    const hh = String(now.getUTCHours()).padStart(2,'0');
+    const mm = String(now.getUTCMinutes()).padStart(2,'0');
+    mapClock.textContent = `${hh}:${mm} UTC`;
+  }
+  updateClock();
+  setInterval(updateClock, 15000);
+
+  // ---- Original little creature icons (not Pokémon artwork) — generated per rarity color ----
+  function hashSeed(str){
+    let h = 0;
+    for(let i=0;i<str.length;i++) h = (h*31 + str.charCodeAt(i)) >>> 0;
+    return h;
+  }
+  function creatureMarkup(color, seedStr){
+    const dark = '#12261A';
+    const v = hashSeed(String(seedStr)) % 8;
+    let extra = '';
+    switch(v){
+      case 0: extra = `<circle cx="6" cy="6.5" r="3" fill="${color}"/><circle cx="18" cy="6.5" r="3" fill="${color}"/>`; break;
+      case 1: extra = `<path d="M5 9 L2 2 L9 7 Z" fill="${color}"/><path d="M19 9 L22 2 L15 7 Z" fill="${color}"/>`; break;
+      case 2: extra = `<line x1="8" y1="6" x2="6" y2="1" stroke="${color}" stroke-width="1.6"/><circle cx="6" cy="1" r="1.4" fill="${color}"/><line x1="16" y1="6" x2="18" y2="1" stroke="${color}" stroke-width="1.6"/><circle cx="18" cy="1" r="1.4" fill="${color}"/>`; break;
+      case 3: extra = `<path d="M12 1 L15 8.5 L9 8.5 Z" fill="${color}"/>`; break;
+      case 4: extra = `<path d="M3 15 Q-2 10 4 6 Q6 11 7 16 Z" fill="${color}"/><path d="M21 15 Q26 10 20 6 Q18 11 17 16 Z" fill="${color}"/>`; break;
+      case 5: extra = `<rect x="9.5" y="2" width="5" height="10" rx="2.5" fill="${color}"/>`; break;
+      case 6: extra = `<path d="M8 7 L10 2 L12 7 Z" fill="${color}"/><path d="M12 7 L14 1 L16 7 Z" fill="${color}"/><path d="M16 8 L18.5 3.5 L19.5 8.5 Z" fill="${color}"/>`; break;
+      default: extra = `<path d="M12 22 Q9 25.5 6 24 Q9 22 9 19 Z" fill="${color}"/><path d="M12 22 Q15 25.5 18 24 Q15 22 15 19 Z" fill="${color}"/>`; break;
+    }
+    return `${extra}
+      <circle cx="12" cy="14.5" r="9" fill="${color}"/>
+      <circle cx="8.4" cy="13" r="2.1" fill="${dark}"/>
+      <circle cx="15.6" cy="13" r="2.1" fill="${dark}"/>
+      <circle cx="9.0" cy="12.35" r="0.65" fill="#fff"/>
+      <circle cx="16.2" cy="12.35" r="0.65" fill="#fff"/>
+      <path d="M9 18 Q12 20 15 18" stroke="${dark}" stroke-width="1.1" fill="none" stroke-linecap="round"/>`;
+  }
+  function monsterIcon(color, seedStr, size){
+    size = size || 22;
+    return `<svg viewBox="-4 -2 32 30" width="${size}" height="${size}" style="flex-shrink:0;" aria-hidden="true">${creatureMarkup(color, seedStr)}</svg>`;
+  }
+  function rarityColor(rarityText){
+    if(/legendary/i.test(rarityText)) return '#F0B429';
+    if(/rare/i.test(rarityText)) return '#D6413B';
+    if(/uncommon/i.test(rarityText)) return '#8FB3FF';
+    return '#7C9473';
+  }
+
+  // ---- Real, pannable, zoomable world map (Leaflet + CARTO tiles) ----
+  const wrap = document.getElementById('worldmap-wrap');
+  const mapFoot = document.getElementById('mapFoot');
+
+  if(typeof L === 'undefined'){
+    wrap.innerHTML = '<div style="position:absolute; inset:0; display:flex; align-items:center; justify-content:center; text-align:center; padding:20px; font-family:\'Space Mono\', monospace; font-size:0.78rem; color:var(--parchment-dim);">Map library failed to load from the CDN — check your internet connection and reload the page.</div>';
+    mapFoot.textContent = 'Map unavailable right now.';
+  } else {
+  const INITIAL_CENTER = [18, 20];
+  const INITIAL_ZOOM = 2;
+
+  const map = L.map('worldmap-map', {
+    center: INITIAL_CENTER,
+    zoom: INITIAL_ZOOM,
+    minZoom: 2,
+    maxZoom: 18,
+    zoomControl: false,
+    worldCopyJump: true,
+    attributionControl: true,
+    scrollWheelZoom: false
+  });
+
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+    subdomains: 'abcd',
+    maxZoom: 19
+  }).addTo(map);
+
+  document.getElementById('zoomIn').addEventListener('click', () => map.zoomIn());
+  document.getElementById('zoomOut').addEventListener('click', () => map.zoomOut());
+  document.getElementById('zoomReset').addEventListener('click', () => map.setView(INITIAL_CENTER, INITIAL_ZOOM));
+
+  wrap.addEventListener('click', () => map.scrollWheelZoom.enable());
+  wrap.addEventListener('mouseleave', () => map.scrollWheelZoom.disable());
+
+  function refreshMapSize(){ map.invalidateSize(); }
+  window.addEventListener('resize', refreshMapSize);
+  if(document.fonts && document.fonts.ready){ document.fonts.ready.then(refreshMapSize); }
+  if(window.ResizeObserver){ new ResizeObserver(refreshMapSize).observe(wrap); }
+  setTimeout(refreshMapSize, 300);
+
+  // ---- Sightings: real remote villages/hamlets around the world ----
+  const sightings = [
+    {lat:47.5622, lng:13.6493,  name:'Lapras',    loc:'Hallstatt, Austria — population ±780', rarity:'Rare'},
+    {lat:52.7392, lng:6.0783,   name:'Psyduck',   loc:'Giethoorn, Netherlands — no roads, only canals', rarity:'Common'},
+    {lat:-8.7500, lng:120.3667, name:'Charizard', loc:'Wae Rebo, Indonesia — just 7 traditional houses', rarity:'✦ Legendary'},
+    {lat:36.2578, lng:136.9066, name:'Absol',     loc:'Shirakawa-gō, Japan — thatched-roof village', rarity:'Rare'},
+    {lat:42.6283, lng:12.1136,  name:'Skarmory',  loc:'Civita di Bagnoregio, Italy — population ±12', rarity:'Uncommon'},
+    {lat:-7.3712, lng:108.2065, name:'Gyarados',  loc:'Kampung Naga, Indonesia — traditional riverside village', rarity:'Rare'},
+    {lat:-0.4667, lng:100.5833, name:'Mewtwo',    loc:'Nagari Pariangan, Indonesia — one of Sumatra\'s oldest villages', rarity:'✦ Legendary'},
+    {lat:51.7592, lng:-1.8106,  name:'Eevee',     loc:'Bibury, England — population ±600', rarity:'Common'},
+    {lat:-13.1547, lng:-72.5253, name:'Zapdos',   loc:'Aguas Calientes, Peru — foot of Machu Picchu', rarity:'✦ Legendary'},
+    {lat:-8.8756, lng:116.2903, name:'Vulpix',    loc:'Desa Sade, Indonesia — traditional Sasak village', rarity:'Rare'},
+    {lat:70.4851, lng:-21.9634, name:'Articuno',  loc:'Ittoqqortoormiit, Greenland — population ±350', rarity:'✦ Legendary'},
+    {lat:78.2232, lng:15.6267,  name:'Glaceon',   loc:'Longyearbyen, Svalbard — world\'s northernmost town', rarity:'Rare'},
+    {lat:12.4634, lng:53.8237,  name:'Exeggutor', loc:'Socotra Island, Yemen — home to endemic flora', rarity:'Uncommon'},
+    {lat:60.7728, lng:-148.6836, name:'Snorlax',  loc:'Whittier, Alaska — nearly the whole town lives in one building', rarity:'Common'},
+    {lat:36.2477, lng:-112.6979, name:'Suicune',  loc:'Supai, Arizona — only reachable on foot or by mule', rarity:'✦ Legendary'},
+    {lat:21.8500, lng:88.1333,  name:'Quagsire',  loc:'Ghoramara Island, India — slowly disappearing into the sea', rarity:'Rare'},
+    {lat:-37.0678, lng:-12.3116, name:'Lugia',    loc:'Tristan da Cunha — the most remote inhabited island on Earth', rarity:'✦ Legendary'},
+    {lat:42.8347, lng:-98.3336, name:'Snorlax', loc:'Monowi, Nebraska, USA — population 1', rarity:'Common'},
+    {lat:54.5361, lng:-3.2727, name:'Poliwag', loc:'Lake District, England — a single row of cottages by the water', rarity:'Common'},
+    {lat:55.4728, lng:-1.5936, name:'Slowpoke', loc:'Northumberland, England — a tiny fishing harbour village', rarity:'Common'},
+    {lat:52.9139, lng:-4.0989, name:'Alakazam', loc:'Portmeirion, Wales — ornamental Italianate village', rarity:'Rare'},
+    {lat:67.9333, lng:13.0833, name:'Lapras', loc:'Lofoten Islands, Norway — fishing village of red cabins', rarity:'Rare'},
+    {lat:67.8869, lng:12.9822, name:'Dewgong', loc:'Å, Lofoten Islands, Norway — village whose entire name is one letter', rarity:'Uncommon'},
+    {lat:68.0075, lng:13.3489, name:'Seel', loc:'Lofoten Islands, Norway — preserved 19th-century fishing hamlet', rarity:'Common'},
+    {lat:62.0975, lng:-7.6614, name:'Skarmory', loc:'Faroe Islands — only reachable by mountain tunnel', rarity:'Uncommon'},
+    {lat:62.2444, lng:-7.2081, name:'Mantine', loc:'Faroe Islands — hamlet cradled inside a tidal lagoon', rarity:'Rare'},
+    {lat:-34.4626, lng:-57.8402, name:'Corsola', loc:'Colonia del Sacramento, Uruguay — cobblestoned colonial port', rarity:'Uncommon'},
+    {lat:-13.2583, lng:-72.2636, name:'Aerodactyl', loc:'Sacred Valley, Peru — Inca village on original terraces', rarity:'Rare'},
+    {lat:14.6667, lng:-90.9667, name:'Torkoal', loc:'San Juan Comalapa, Guatemala — Kaqchikel Maya highland village', rarity:'Uncommon'},
+    {lat:-54.6833, lng:-68.4333, name:'Delibird', loc:'Tierra del Fuego, Argentina — near the world\'s southernmost settlements', rarity:'Rare'},
+    {lat:35.1714, lng:-5.2696, name:'Shellder', loc:'Chefchaouen, Morocco — mountain town painted entirely in blue', rarity:'Uncommon'},
+    {lat:32.49, lng:3.6736, name:'Sandshrew', loc:'M\'zab Valley, Algeria — walled desert village of the Mozabite people', rarity:'Common'},
+    {lat:12.0317, lng:39.0473, name:'Golett', loc:'Lalibela, Ethiopia — highland town of rock-hewn churches', rarity:'Rare'},
+    {lat:37.7333, lng:46.05, name:'Onix', loc:'Kandovan, Iran — homes carved into volcanic rock cones', rarity:'Uncommon'},
+    {lat:37.15, lng:48.9833, name:'Skiploom', loc:'Masuleh, Gilan, Iran — terraced mountain village', rarity:'Common'},
+    {lat:40.0758, lng:20.1389, name:'Geodude', loc:'Gjirokastër, Albania — stone hillside town of a thousand steps', rarity:'Common'},
+    {lat:42.4247, lng:18.7712, name:'Wailmer', loc:'Kotor, Montenegro — walled town beneath the Bay of Kotor cliffs', rarity:'Uncommon'},
+    {lat:36.8564, lng:-5.1793, name:'Onix', loc:'Setenil de las Bodegas, Spain — village built into a rock gorge', rarity:'Uncommon'},
+    {lat:48.1667, lng:7.2989, name:'Sunflora', loc:'Riquewihr, Alsace, France — half-timbered wine village', rarity:'Common'},
+    {lat:43.7276, lng:7.3616, name:'Skarmory', loc:'Èze, French Riviera — clifftop medieval village', rarity:'Uncommon'},
+    {lat:49.3779, lng:10.1793, name:'Steelix', loc:'Rothenburg ob der Tauber, Bavaria — walled medieval town', rarity:'Rare'},
+    {lat:47.5622, lng:13.6493, name:'Vaporeon', loc:'Salzkammergut, Austria — far side of the lake', rarity:'Rare'},
+    {lat:44.1354, lng:9.6836, name:'Krabby', loc:'Cinque Terre, Italy — cliffside fishing village with no cars', rarity:'Common'},
+    {lat:40.7844, lng:17.2378, name:'Trapinch', loc:'Alberobello, Puglia — town of conical trulli houses', rarity:'Uncommon'},
+    {lat:51.7592, lng:-1.8106, name:'Eevee', loc:'Cotswolds, England — along the River Coln', rarity:'Common'},
+    {lat:54.6028, lng:-3.0975, name:'Solrock', loc:'Cumbria, England — hamlet beside a 5,000-year-old stone circle', rarity:'Rare'},
+    {lat:54.5589, lng:-0.7847, name:'Corphish', loc:'North Yorkshire, England — former fishing village down a steep cliff', rarity:'Common'},
+    {lat:57.3369, lng:-5.6547, name:'Tentacool', loc:'Scottish Highlands — palm-tree-lined village on a sea loch', rarity:'Common'},
+    {lat:57.4126, lng:-6.1946, name:'Lapras', loc:'Isle of Skye, Scotland — harbour town of pastel houses', rarity:'Rare'},
+    {lat:53.0167, lng:-9.3833, name:'Wingull', loc:'County Clare, Ireland — village at the foot of the Cliffs of Moher', rarity:'Common'},
+    {lat:52.1408, lng:-10.27, name:'Finneon', loc:'County Kerry, Ireland — harbour town famous for a lone dolphin', rarity:'Common'},
+    {lat:65.6403, lng:-16.9111, name:'Magcargo', loc:'Lake Myvatn, Iceland — village beside geothermal fields', rarity:'Rare'},
+    {lat:63.4186, lng:-19.006, name:'Cloyster', loc:'Iceland — village by black-sand sea stacks', rarity:'Uncommon'},
+    {lat:70.4851, lng:-21.9634, name:'Beartic', loc:'East Greenland — near the world\'s remotest fjord town', rarity:'Rare'},
+    {lat:78.2232, lng:15.6267, name:'Cubchoo', loc:'Svalbard — world\'s northernmost town', rarity:'Uncommon'},
+    {lat:78.6558, lng:16.3378, name:'Regice', loc:'Svalbard — abandoned Russian mining settlement in the Arctic', rarity:'✦ Legendary'},
+    {lat:56.6231, lng:-6.0678, name:'Luvdisc', loc:'Isle of Mull, Scotland — harbour of brightly painted shopfronts', rarity:'Uncommon'},
+    {lat:46.0207, lng:7.7491, name:'Abomasnow', loc:'Zermatt, Switzerland — car-free alpine village beneath the Matterhorn', rarity:'Rare'},
+    {lat:46.5561, lng:7.8894, name:'Snover', loc:'Bernese Oberland, Switzerland — car-free hamlet of about 130 people', rarity:'Common'},
+    {lat:47.4761, lng:13.19, name:'Glalie', loc:'Salzburg, Austria — village below the world\'s largest ice cave', rarity:'Rare'},
+    {lat:40.1667, lng:-7.75, name:'Bonsly', loc:'Portugal — schist mountain village of the Serra do Açor', rarity:'Common'},
+    {lat:39.3608, lng:-9.1569, name:'Farfetch\'d', loc:'Óbidos, Portugal — tiny walled town of whitewashed houses', rarity:'Uncommon'},
+    {lat:39.4, lng:-7.3778, name:'Rhyhorn', loc:'Portugal — hilltop walled village on the Spanish border', rarity:'Common'},
+    {lat:46.3683, lng:14.1147, name:'Azumarill', loc:'Bled, Slovenia — lakeside town with an island church', rarity:'Uncommon'},
+    {lat:48.8127, lng:14.3175, name:'Marill', loc:'South Bohemia, Czechia — town looped by the Vltava River', rarity:'Common'},
+    {lat:54.6383, lng:24.9344, name:'Golduck', loc:'Trakai, Lithuania — lakeside town around an island castle', rarity:'Common'},
+    {lat:45.0811, lng:13.6387, name:'Wartortle', loc:'Istria, Croatia — former island town joined to the mainland', rarity:'Uncommon'},
+    {lat:45.4939, lng:10.6089, name:'Politoed', loc:'Lake Garda, Italy — small town on a narrow peninsula', rarity:'Uncommon'},
+    {lat:44.1067, lng:9.7292, name:'Staryu', loc:'Cinque Terre, Italy — pastel fishing hamlet on the cliffs', rarity:'Common'},
+    {lat:40.628, lng:14.4849, name:'Luvdisc', loc:'Amalfi Coast, Italy — village stacked down a cliff to the sea', rarity:'Uncommon'},
+    {lat:45.9822, lng:6.9639, name:'Delibird', loc:'French Alps — tiny hamlet at the head of the Chamonix valley', rarity:'Rare'},
+    {lat:45.8322, lng:6.2136, name:'Poliwhirl', loc:'French Alps — lakeside village on Lac d\'Annecy', rarity:'Common'},
+    {lat:52.4597, lng:5.1136, name:'Psyduck', loc:'Netherlands — former fishing island village behind the dyke', rarity:'Common'},
+    {lat:52.7392, lng:6.0783, name:'Lombre', loc:'Giethoorn, Netherlands — still no roads, only canals', rarity:'Common'},
+    {lat:51.2531, lng:3.2867, name:'Slowking', loc:'Belgium — tiny canal town near Bruges', rarity:'Rare'},
+    {lat:67.95, lng:13.1167, name:'Relicanth', loc:'Lofoten Islands, Norway — cluster of red fishermen\'s cabins on stilts', rarity:'Rare'},
+    {lat:69.3844, lng:-81.7981, name:'Sneasel', loc:'Nunavut, Canada — small Inuit hamlet on the Arctic tundra', rarity:'Uncommon'},
+    {lat:69.4541, lng:-133.0374, name:'Walrein', loc:'Northwest Territories, Canada — hamlet on the Arctic Ocean coast', rarity:'Rare'},
+    {lat:58.7684, lng:-94.165, name:'Regice', loc:'Churchill, Manitoba — polar bear capital of the world', rarity:'✦ Legendary'},
+    {lat:44.3781, lng:-64.3153, name:'Kingler', loc:'Nova Scotia, Canada — colourful UNESCO fishing port', rarity:'Uncommon'},
+    {lat:60.7728, lng:-148.6836, name:'Snorlax', loc:'Whittier, Alaska — nearly the whole town lives in one building', rarity:'Common'},
+    {lat:36.2477, lng:-112.6979, name:'Suicune', loc:'Supai, Arizona — only reachable on foot or by mule', rarity:'✦ Legendary'},
+    {lat:37.9268, lng:-75.3789, name:'Ponyta', loc:'Chincoteague, Virginia — island town famous for wild ponies', rarity:'Common'},
+    {lat:45.6693, lng:-121.8931, name:'Pidgeotto', loc:'Oregon, USA — tiny town on the Columbia River Gorge', rarity:'Common'},
+    {lat:60.543, lng:-145.7581, name:'Gyarados', loc:'Cordova, Alaska — fishing town reachable only by air or sea', rarity:'Rare'},
+    {lat:38.023, lng:-107.6714, name:'Larvitar', loc:'Ouray, Colorado — ringed by sheer mountains', rarity:'Uncommon'},
+    {lat:37.1467, lng:-109.86, name:'Gligar', loc:'Mexican Hat, Utah — tiny desert town named for a balanced rock', rarity:'Common'},
+    {lat:48.3689, lng:-99.9942, name:'Girafarig', loc:'Rugby, North Dakota — near the geographic centre of North America', rarity:'Uncommon'},
+    {lat:37.9633, lng:-122.5578, name:'Espeon', loc:'California, USA — one of the smallest incorporated towns in the state', rarity:'Rare'},
+    {lat:37.8237, lng:-75.9958, name:'Quagsire', loc:'Chesapeake Bay, USA — slowly-sinking fishing island village', rarity:'Rare'},
+    {lat:14.69, lng:-91.2733, name:'Poliwrath', loc:'Lake Atitlán, Guatemala — volcano-side lakeside village', rarity:'Uncommon'},
+    {lat:-54.935, lng:-67.6156, name:'Delibird', loc:'Puerto Williams, Chile — the world\'s southernmost town', rarity:'Rare'},
+    {lat:-47.7833, lng:-73.5333, name:'Wooper', loc:'Patagonia, Chile — village built entirely on cypress boardwalks', rarity:'Common'},
+    {lat:-26.7414, lng:-49.1758, name:'Combee', loc:'Santa Catarina, Brazil — town of half-timbered German houses', rarity:'Common'},
+    {lat:39.6111, lng:-9.0714, name:'Wailmer', loc:'Portugal — clifftop fishing hamlet above giant surf waves', rarity:'Uncommon'},
+    {lat:-7.3712, lng:108.2065, name:'Gyarados', loc:'West Java, Indonesia — traditional riverside village', rarity:'Rare'},
+    {lat:-0.4667, lng:100.5833, name:'Mewtwo', loc:'West Sumatra, Indonesia — one of Sumatra\'s oldest villages', rarity:'✦ Legendary'},
+    {lat:-8.4132, lng:115.3608, name:'Vulpix', loc:'Bali, Indonesia — traditional Balinese village kept car-free', rarity:'Rare'},
+    {lat:-8.75, lng:120.3667, name:'Charizard', loc:'Flores, Indonesia — just 7 traditional houses', rarity:'✦ Legendary'},
+    {lat:-8.7278, lng:115.5439, name:'Sharpedo', loc:'Nusa Penida, Bali — small coastal hamlet', rarity:'Rare'},
+    {lat:36.3167, lng:136.9167, name:'Ninetales', loc:'Toyama, Japan — thatched-roof gassho-zukuri hamlet', rarity:'Rare'},
+    {lat:36.2578, lng:136.9066, name:'Absol', loc:'Gifu, Japan — thatched-roof village', rarity:'Rare'},
+    {lat:30.3167, lng:130.65, name:'Celebi', loc:'Yakushima, Japan — port hamlet on an ancient cedar-forest island', rarity:'✦ Legendary'},
+    {lat:34.4597, lng:133.9994, name:'Chimecho', loc:'Seto Inland Sea, Japan — island village turned open-air art site', rarity:'Uncommon'},
+    {lat:36.5389, lng:128.5183, name:'Farfetch\'d', loc:'Andong, South Korea — traditional riverside clan village', rarity:'Uncommon'},
+    {lat:20.8525, lng:107.2069, name:'Mantyke', loc:'Ha Long Bay, Vietnam — floating fishing village on the bay', rarity:'Uncommon'},
+    {lat:27.4833, lng:90.4333, name:'Togepi', loc:'Bhutan — small farming village in the eastern highlands', rarity:'Uncommon'},
+    {lat:27.7154, lng:85.5215, name:'Altaria', loc:'Nepal — hill village with views of the Himalaya', rarity:'Rare'},
+    {lat:27.8267, lng:86.7133, name:'Articuno', loc:'Khumbu, Nepal — Sherpa village near Everest', rarity:'✦ Legendary'},
+    {lat:30.0667, lng:80.2333, name:'Swinub', loc:'Uttarakhand, India — Himalayan border village', rarity:'Common'},
+    {lat:21.85, lng:88.1333, name:'Quagsire', loc:'West Bengal, India — slowly disappearing into the sea', rarity:'Rare'},
+    {lat:-8.8756, lng:116.2903, name:'Alolan Vulpix', loc:'Lombok, Indonesia — traditional Sasak village', rarity:'Rare'},
+    {lat:12.6667, lng:53.4833, name:'Exeggutor', loc:'Socotra Island, Yemen — fishing village near the dragon\'s-blood forests', rarity:'Uncommon'},
+    {lat:29.2032, lng:25.5195, name:'Trapinch', loc:'Egypt — desert oasis town near the Libyan border', rarity:'Uncommon'},
+    {lat:31.0472, lng:-7.1319, name:'Sandslash', loc:'Morocco — fortified earthen village (ksar) on an old caravan route', rarity:'Common'},
+    {lat:-23.8994, lng:15.9436, name:'Hippopotas', loc:'Namibia — single-street desert hamlet in the dunes', rarity:'Common'},
+    {lat:-11.6036, lng:34.2989, name:'Feebas', loc:'Malawi — fishing town on the shore of Lake Malawi', rarity:'Rare'},
+  ];
+
+  function rarityClassFor(rarityText){
+    if(/legendary/i.test(rarityText)) return 'rarity-legendary';
+    if(/rare/i.test(rarityText)) return 'rarity-rare';
+    if(/uncommon/i.test(rarityText)) return 'rarity-uncommon';
+    return 'rarity-common';
+  }
+
+  const markers = [];
+  sightings.forEach((s, idx) => {
+    const color = rarityColor(s.rarity);
+    const rClass = rarityClassFor(s.rarity);
+    // Slightly stagger the float animation so pins don't move in perfect unison
+    const delay = (idx % 7) * 0.22;
+    const icon = L.divIcon({
+      className: 'poke-pin-wrap',
+      html: `<div class="poke-pin ${rClass}" style="animation-delay:${delay}s; color:${color}">
+               <div class="pin-glow" style="background:${color}"></div>
+               <div class="pin-ring" style="border-color:${color}"></div>
+               <div class="pin-dot" style="background:${color}"></div>
+               ${monsterIcon(color, s.name, 22)}
+             </div>`,
+      iconSize: [34, 44],
+      iconAnchor: [17, 40],
+      popupAnchor: [0, -40]
+    });
+
+    const marker = L.marker([s.lat, s.lng], {
+      icon,
+      keyboard: true,
+      alt: `${s.name} — ${s.loc} — Rarity: ${s.rarity}`
+    }).addTo(map);
+
+    const popupIcon = monsterIcon(color, s.name, 30);
+    marker.bindPopup(
+      `<div class="poke-popup" style="display:flex; gap:10px; align-items:flex-start;">${popupIcon}<div><span class="pname">${s.name}</span><span class="ploc">${s.loc}</span><span class="prar">Rarity: ${s.rarity}</span></div></div>`,
+      {maxWidth: 260}
+    );
+    marker.on('click', () => playCatchSound(s.rarity));
+
+    markers.push({marker, rClass});
+  });
+
+  mapFoot.textContent = `${sightings.length} pins placed in the world's smallest villages and hamlets — tap any pin for details, or search any place above.`;
+
+  // ---- Legend acts as a rarity filter for the pins ----
+  const legendButtons = document.querySelectorAll('#mapLegend .lg-item');
+  let activeRarity = null;
+  legendButtons.forEach(btn => {
+    btn.addEventListener('click', () => {
+      const rarity = btn.dataset.rarity;
+      activeRarity = (activeRarity === rarity) ? null : rarity;
+      legendButtons.forEach(b => b.classList.toggle('active', b.dataset.rarity === activeRarity));
+      let visibleCount = 0;
+      markers.forEach(({marker, rClass}) => {
+        const matches = !activeRarity || rClass === activeRarity;
+        const el = marker.getElement();
+        if(el){
+          const pin = el.querySelector('.poke-pin');
+          if(pin) pin.classList.toggle('dimmed', !matches);
+        }
+        marker.setZIndexOffset(matches ? 1000 : 0);
+        if(matches) visibleCount++;
+      });
+      mapFoot.textContent = activeRarity
+        ? `Showing ${visibleCount} of ${sightings.length} pins — filtered by rarity. Tap the tier again to clear.`
+        : `${sightings.length} pins placed in the world's smallest villages and hamlets — tap any pin for details.`;
+    });
+  });
+
+  // ---- Real place search (Nominatim) ----
+  const searchForm = document.getElementById('mapSearchForm');
+  const searchInput = document.getElementById('mapSearchInput');
+  const searchStatus = document.getElementById('mapSearchStatus');
+  let searchMarker = null;
+  const searchIcon = L.divIcon({
+    className: 'poke-pin-wrap',
+    html: `<div class="poke-pin" style="color:#F0B429">
+             <div class="pin-glow" style="background:#F0B429"></div>
+             <div class="pin-ring" style="border-color:#F0B429"></div>
+             <div class="pin-dot" style="background:#F0B429"></div>
+           </div>`,
+    iconSize: [34, 44],
+    iconAnchor: [17, 40],
+    popupAnchor: [0, -40]
+  });
+
+  searchForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const query = searchInput.value.trim();
+    if(!query) return;
+    searchStatus.textContent = 'Searching…';
+    try{
+      const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(query)}`);
+      const results = await res.json();
+      if(results && results.length){
+        const {lat, lon, display_name} = results[0];
+        map.flyTo([parseFloat(lat), parseFloat(lon)], 11, {duration: 1.1});
+        if(searchMarker) map.removeLayer(searchMarker);
+        searchMarker = L.marker([lat, lon], {icon: searchIcon}).addTo(map)
+          .bindPopup(`<div class="poke-popup"><span class="pname">${query}</span><span class="ploc">${display_name}</span></div>`)
+          .openPopup();
+        searchStatus.textContent = display_name;
+        playSearchSuccess();
+      } else {
+        searchStatus.textContent = `Place "${query}" not found — try a different name.`;
+        playSearchFail();
+      }
+    } catch(err){
+      searchStatus.textContent = 'Search failed. Check your connection and try again.';
+      playSearchFail();
+    }
+  });
+
+  // ---- Summon: drop a random Pokémon pin somewhere currently visible on the map ----
+  const summonBtn = document.getElementById('summonBtn');
+  const summonPool = [
+    {name:'Pikachu', rarity:'Common'}, {name:'Eevee', rarity:'Common'},
+    {name:'Bulbasaur', rarity:'Common'}, {name:'Squirtle', rarity:'Common'},
+    {name:'Charmander', rarity:'Common'}, {name:'Growlithe', rarity:'Common'},
+    {name:'Rattata', rarity:'Common'}, {name:'Pidgey', rarity:'Common'},
+    {name:'Vulpix', rarity:'Uncommon'}, {name:'Jigglypuff', rarity:'Uncommon'},
+    {name:'Machop', rarity:'Uncommon'}, {name:'Abra', rarity:'Uncommon'},
+    {name:'Magnemite', rarity:'Uncommon'}, {name:'Gastly', rarity:'Uncommon'},
+    {name:'Gyarados', rarity:'Rare'}, {name:'Dragonite', rarity:'Rare'},
+    {name:'Snorlax', rarity:'Rare'}, {name:'Alakazam', rarity:'Rare'},
+    {name:'Lapras', rarity:'Rare'}, {name:'Espeon', rarity:'Rare'},
+    {name:'Charizard', rarity:'✦ Legendary'}, {name:'Mewtwo', rarity:'✦ Legendary'},
+    {name:'Mew', rarity:'✦ Legendary'}, {name:'Articuno', rarity:'✦ Legendary'},
+    {name:'Zapdos', rarity:'✦ Legendary'}, {name:'Lugia', rarity:'✦ Legendary'},
+  ];
+
+  function rollRarity(){
+    const roll = Math.random();
+    if(roll < 0.5) return 'Common';
+    if(roll < 0.78) return 'Uncommon';
+    if(roll < 0.94) return 'Rare';
+    return '✦ Legendary';
+  }
+
+  function randomPointInView(){
+    const b = map.getBounds();
+    return {
+      lat: b.getSouth() + Math.random() * (b.getNorth() - b.getSouth()),
+      lng: b.getWest() + Math.random() * (b.getEast() - b.getWest())
+    };
+  }
+
+  summonBtn.addEventListener('click', () => {
+    summonBtn.disabled = true;
+    const rarity = rollRarity();
+    const candidates = summonPool.filter(p => p.rarity === rarity);
+    const pick = candidates[Math.floor(Math.random() * candidates.length)];
+    const {lat, lng} = randomPointInView();
+    const color = rarityColor(rarity);
+    const rClass = rarityClassFor(rarity);
+    const seed = pick.name + '-' + Date.now();
+
+    const icon = L.divIcon({
+      className: 'poke-pin-wrap',
+      html: `<div class="poke-pin ${rClass} summon-pop" style="color:${color}">
+               <div class="pin-glow" style="background:${color}"></div>
+               <div class="pin-ring" style="border-color:${color}"></div>
+               <div class="pin-dot" style="background:${color}"></div>
+               ${monsterIcon(color, seed, 22)}
+             </div>`,
+      iconSize: [34, 44],
+      iconAnchor: [17, 40],
+      popupAnchor: [0, -40]
+    });
+
+    const marker = L.marker([lat, lng], {
+      icon,
+      keyboard: true,
+      alt: `${pick.name} appeared randomly — Rarity: ${rarity}`
+    }).addTo(map);
+
+    const popupIcon = monsterIcon(color, seed + '-popup', 30);
+    marker.bindPopup(
+      `<div class="poke-popup" style="display:flex; gap:10px; align-items:flex-start;">${popupIcon}<div><span class="pname">${pick.name} appeared!</span><span class="ploc">Summoned directly to the map — not yet community-verified</span><span class="prar">Rarity: ${rarity}</span></div></div>`,
+      {maxWidth: 260}
+    ).openPopup();
+    marker.on('click', () => playCatchSound(rarity));
+    playSummonSound(rarity);
+
+    markers.push({marker, rClass});
+    mapFoot.textContent = `✨ ${pick.name} just summoned to the map! Rarity: ${rarity}.`;
+
+    setTimeout(() => { summonBtn.disabled = false; }, 700);
+  });
+
+  } // end of the "Leaflet loaded successfully" branch
+
+  // ---- Swap flat rarity dots in the Trending list for little creature icons ----
+  document.querySelectorAll('.trend-poke .dot').forEach((dot, idx) => {
+    const color = dot.style.background || getComputedStyle(dot).backgroundColor;
+    const label = dot.closest('.trend-poke').textContent.trim();
+    const iconHtml = monsterIcon(color, label + idx, 18);
+    const temp = document.createElement('span');
+    temp.style.display = 'inline-flex';
+    temp.innerHTML = iconHtml;
+    dot.replaceWith(temp);
+  });
+
+  // Ticker feed (duplicated for seamless loop)
+  const entries = [
+    {t:'06:14', name:'Bulbasaur', loc:'Prospect Park, New York', rarity:'Common', cls:''},
+    {t:'06:22', name:'Gyarados', loc:'Lake Toba, Indonesia', rarity:'Rare', cls:'rarity-rare-t'},
+    {t:'06:41', name:'Mewtwo', loc:'Mount Bromo, Indonesia', rarity:'✦ Legendary', cls:'rarity-leg'},
+    {t:'06:58', name:'Pikachu', loc:'Shibuya Crossing, Tokyo', rarity:'Common', cls:''},
+    {t:'07:03', name:'Eevee', loc:'Kew Gardens, London', rarity:'Uncommon', cls:''},
+    {t:'07:19', name:'Lapras', loc:'Hallstatt, Austria', rarity:'Rare', cls:'rarity-rare-t'},
+  ];
+  const track = document.getElementById('tickerTrack');
+  function renderTicker(){
+    let html = '';
+    for(let i=0;i<2;i++){
+      entries.forEach(e=>{
+        const icon = monsterIcon(rarityColor(e.rarity), e.name, 15);
+        html += `<span class="ticker-item">${icon} ${e.t} · <b>${e.name}</b> · ${e.loc} · <span class="${e.cls}">${e.rarity}</span></span>`;
+      });
+    }
+    track.innerHTML = html;
+  }
+  renderTicker();
+
+</script>
+
+</body>
+</html>
